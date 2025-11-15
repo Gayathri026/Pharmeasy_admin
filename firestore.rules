@@ -1,0 +1,107 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ==================== SELLERS COLLECTION ====================
+    match /sellers/{sellerId} {
+      // Only authenticated users can read seller info
+      allow read: if request.auth != null;
+      
+      // Only admins can create/update/delete sellers
+      // For now, allowing authenticated users (update this when you add admin roles)
+      allow create, update, delete: if request.auth != null;
+    }
+    
+    // ==================== PRODUCTS COLLECTION ====================
+    match /products/{productId} {
+      // Anyone can read products (for browsing)
+      allow read: if true;
+      
+      // Only authenticated sellers/admins can create/update products
+      allow create, update: if request.auth != null;
+      
+      // Only admins can delete products
+      allow delete: if request.auth != null;
+    }
+    
+    // ==================== ORDERS COLLECTION ====================
+    match /orders/{orderId} {
+      // Users can read their own orders, admins can read all
+      allow read: if request.auth != null && 
+                     (request.auth.uid == resource.data.user_id || 
+                      true); // Change to admin check when implemented
+      
+      // Users can create orders
+      allow create: if request.auth != null && 
+                       request.auth.uid == request.resource.data.user_id;
+      
+      // Users can update their own orders (for cancellation)
+      // Admins/sellers can update any order (for status changes)
+      allow update: if request.auth != null && 
+                       (request.auth.uid == resource.data.user_id || 
+                        true); // Change to admin/seller check when implemented
+      
+      // Only admins can delete orders
+      allow delete: if request.auth != null; // Change to admin check when implemented
+    }
+    
+    // ==================== USERS COLLECTION (if you add it later) ====================
+    match /users/{userId} {
+      // Users can read/write their own data
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+
+// PRODUCTION READY RULES (uncomment when you implement roles):
+/*
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Helper function to check if user is seller
+    function isSeller() {
+      return request.auth != null && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'seller';
+    }
+    
+    match /sellers/{sellerId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
+    }
+    
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update: if isAdmin() || isSeller();
+      allow delete: if isAdmin();
+    }
+    
+    match /orders/{orderId} {
+      allow read: if request.auth != null && 
+                     (request.auth.uid == resource.data.user_id || 
+                      isAdmin() || 
+                      isSeller());
+      
+      allow create: if request.auth != null && 
+                       request.auth.uid == request.resource.data.user_id;
+      
+      allow update: if request.auth != null && 
+                       (request.auth.uid == resource.data.user_id || 
+                        isAdmin() || 
+                        isSeller());
+      
+      allow delete: if isAdmin();
+    }
+    
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isAdmin();
+    }
+  }
+}
+*/
